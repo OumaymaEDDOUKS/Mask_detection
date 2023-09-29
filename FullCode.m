@@ -1,0 +1,409 @@
+
+function varargout = FullCode(varargin)
+% FULLCODE MATLAB code for FullCode.fig
+%      FULLCODE, by itself, creates a new FULLCODE or raises the existing
+%      singleton*.
+%
+%      H = FULLCODE returns the handle to a new FULLCODE or the handle to
+%      the existing singleton*.
+%
+%      FULLCODE('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in FULLCODE.M with the given input arguments.
+%
+%      FULLCODE('Property','Value',...) creates a new FULLCODE or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before FullCode_OpeningFcn gets called.  An
+%      unrecognized property name or invalid value makes property application
+%      stop.  All inputs are passed to FullCode_OpeningFcn via varargin.
+%
+%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+%      instance to run (singleton)".
+%
+% See also: GUIDE, GUIDATA, GUIHANDLES
+
+% Edit the above text to modify the response to help FullCode
+
+% Last Modified by GUIDE v2.5 15-May-2022 13:19:29
+
+% Begin initialization code - DO NOT EDIT
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @FullCode_OpeningFcn, ...
+                   'gui_OutputFcn',  @FullCode_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+
+% --- Executes just before FullCode is made visible.
+function FullCode_OpeningFcn(hObject, eventdata, handles, varargin)
+% This function has no output args, see OutputFcn.
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to FullCode (see VARARGIN)
+
+% Choose default command line output for FullCode
+handles.output = hObject;
+
+% Update handles structure
+guidata(hObject, handles);
+
+% UIWAIT makes FullCode wait for user response (see UIRESUME)
+% uiwait(handles.Oumayma);
+
+
+% --- Outputs from this function are returned to the command line.
+function varargout = FullCode_OutputFcn(hObject, eventdata, handles) 
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+
+
+
+% --- Executes on button press in ImageTrain.
+function ImageTrain_Callback(hObject, eventdata, handles)
+% hObject    handle to ImageTrain (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+ data=imageDatastore('Images','IncludeSubFolders',true,'LabelSource','foldernames');
+
+
+
+ num=2;
+[Traindata,Testdata] = splitEachLabel(data,num,'randomize');
+
+
+options = trainingOptions("sgdm", ...
+    LearnRateSchedule="piecewise", ...
+    LearnRateDropFactor=0.2, ...
+    LearnRateDropPeriod=5, ...
+    MaxEpochs=20, ...
+    MiniBatchSize=64, ...
+    Plots="training-progress")
+
+layers = [
+    imageInputLayer([255 255 3])
+    convolution2dLayer(3,8,Padding="same")
+    batchNormalizationLayer
+    reluLayer   
+    maxPooling2dLayer(2,Stride=2)
+    convolution2dLayer(3,16,Padding="same")
+    batchNormalizationLayer
+    reluLayer
+    maxPooling2dLayer(2,Stride=2)
+    convolution2dLayer(3,32,Padding="same")
+    batchNormalizationLayer
+    reluLayer
+    fullyConnectedLayer(num)
+    softmaxLayer
+    classificationLayer];
+
+augmenter = imageDataAugmenter( ...
+    'RandRotation',[0 360], ...
+    'RandScale',[0.5 1])
+
+  auimds=augmentedImageDatastore([255 255],Traindata,'DataAugmentation',augmenter);
+  mynet=trainNetwork(auimds,layers,options);
+ save mynet
+   
+
+% --- Executes on button press in ImageTest.
+function ImageTest_Callback(hObject, eventdata, handles)
+% hObject    handle to ImageTest (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+load mynet.mat
+%   clc
+%    clear all
+%  close all
+
+
+
+%  augtestimds=augmentedImageDatastore([255,255],imds);
+% % 
+%  predicted_labels=classify(mynet,augtestimds);
+%  
+%   [filename,pathname]=uigetfile('*.*','Images');
+%  filename=strcat(pathname,filename);
+%  a=imread(filename);
+a=getappdata(0,'a');
+imResized=imresize(a,[255,255]);
+[class,score]=classify(mynet,imResized);
+
+axes(handles.axes3);
+imshow(imResized);
+
+title(['predClass=' char(string(class)),',','score=',num2str(max(score))])
+
+
+% --- Executes on button press in pushbutton3.
+
+
+% --- Executes on button press in dataDirect.
+function dataDirect_Callback(hObject, eventdata, handles)
+% hObject    handle to dataDirect (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+%======= Data Collection:
+
+clc
+clear all
+close all
+warning off;
+cao=webcam;
+faceDetector=vision.CascadeObjectDetector;
+c=15;
+temp=0;
+while true
+    e=cao.snapshot;
+    bboxes =step(faceDetector,e);
+    if(sum(sum(bboxes))~=0)
+    if(temp>=c)
+        break;
+    else
+    es=imcrop(e,bboxes(1,:));
+    es=imresize(es,[227 227]);
+    filename=strcat(num2str(temp),'.bmp');
+    imwrite(es,filename);
+    temp=temp+1;
+    imshow(es);
+    drawnow;
+    end
+    else
+        imshow(e);
+        drawnow;
+    end
+end
+% --- Executes on button press in trainDirect.
+function trainDirect_Callback(hObject, eventdata, handles)
+% hObject    handle to trainDirect (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+%Training model:
+% clc
+% clear all
+% close all
+% warning off
+g=alexnet;
+layers=g.Layers;
+layers(23)=fullyConnectedLayer(2);
+layers(25)=classificationLayer;
+
+
+
+allImages=imageDatastore('pictures','IncludeSubfolders',true, 'LabelSource','foldernames');
+opts=trainingOptions('sgdm','InitialLearnRate',0.001,'MaxEpochs',20,'MiniBatchSize',64);
+myNet1=trainNetwork(allImages,layers,opts);
+save myNet1;
+
+% --- Executes on button press in testDirect.
+function testDirect_Callback(hObject, eventdata, handles)
+% hObject    handle to testDirect (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+%Testing Model:
+
+
+ 
+%  t='wait'
+%  set(handles.edit2,'String',t)
+%  pause(0.1)
+
+ load myNet1;
+
+%  t='camera is ready'
+%  set(handles.edit2,'String',t)
+
+c=webcam;
+ faceDetector=vision.CascadeObjectDetector;
+ 
+ test=0;
+while true && test<300
+    e=c.snapshot;
+    bboxes =step(faceDetector,e);
+    if(sum(sum(bboxes))~=0)
+     es=imcrop(e,bboxes(1,:));
+    es=imresize(es,[227 227]);
+  
+    label=classify(myNet1,es);
+    axes(handles.axes4);
+    imshow(e);
+    a=char(label);
+    title(a);
+    drawnow
+    if strcmp(a,'mask')
+    p='you are wearing mask thanks';
+    NET.addAssembly('System.Speech');
+       ss=System.Speech.Synthesis.SpeechSynthesizer;
+       ss.Volume=100;
+       Speak(ss,p)
+       
+   
+        
+    else
+    p='No mask kindly wear to protect your self';
+    NET.addAssembly('System.Speech');
+       ss=System.Speech.Synthesis.SpeechSynthesizer;
+       ss.Volume=100;
+       Speak(ss,p) 
+    end
+    else
+        axes(handles.axes4);
+
+        imshow(e);
+        title('No Face Detected');
+       drawnow
+       p='your face is not detected';
+       NET.addAssembly('System.Speech');
+       ss=System.Speech.Synthesis.SpeechSynthesizer;
+       ss.Volume=100;
+       Speak(ss,p)
+    end
+    test=test+1;
+end
+
+
+
+function edit2_Callback(hObject, eventdata, handles)
+% hObject    handle to edit2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit2 as text
+%        str2double(get(hObject,'String')) returns contents of edit2 as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit2_CreateFcn(hObject, ~, handles)
+% hObject    handle to edit2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+% --- Executes on button press in imageData.
+function imageData_Callback(hObject, eventdata, handles)
+% hObject    handle to imageData (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% [filename,pathname]=uigetfile('*.*','Images');
+% filename=strcat(pathname,filename);
+% a=imread(filename);
+% axes(handles.axes1);
+% imshow(a);
+% handles.a=a;
+% guidata(hObject,handles);
+
+ [filename,pathname]=uigetfile('*.*','Images');
+ filename=strcat(pathname,filename);
+ a=imread(filename);
+  axes(handles.axes1);
+
+ imshow(a);
+ setappdata(0,'a',a);
+ setappdata(0,'filename',a);
+
+
+
+
+% --- Executes on button press in Close.
+function Close_Callback(hObject, eventdata, handles)
+% hObject    handle to Close (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+close('FullCode');
+run('Segmentation');
+
+% --- Executes on button press in pushbutton10.
+function pushbutton10_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton10 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in pushbutton11.
+function pushbutton11_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton11 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in pushbutton12.
+function pushbutton12_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton12 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+a=getappdata(0,'a');
+a_bw=im2bw(a,.57);
+axes(handles.axes5);
+imshow(a_bw);
+setappdata(0,'filename',a_bw);
+
+pause(1)
+ a=getappdata(0,'a');
+red=a;
+red(:,:,2:3)=0;
+setappdata(0,'filename',red);
+setappdata(0,'ImRotation',red);
+axes(handles.axes5);
+imshow(red);
+
+pause(1);
+
+
+
+
+% --- Executes on button press in Previous.
+function Previous_Callback(hObject, eventdata, handles)
+% hObject    handle to Previous (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+close('FullCode');
+run('userId');
+% --- Executes during object creation, after setting all properties.
+
+
+
+function Oumayma_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to Oumayma (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+
+
+
+% --- Executes during object creation, after setting all properties.
+function axes17_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to axes17 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: place code in OpeningFcn to populate axes17
+imshow('3.jpg');
